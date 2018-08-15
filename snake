@@ -1,0 +1,234 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+#include <conio.h>
+#define M 50
+#define N 20
+
+typedef struct {	//creamos el tipo punto
+	int x, y;	//con sus coordenadas
+} point;
+
+struct queue {	//creamos el tipo cuerpo
+	point arr[100];	//arreglo (es una cola, shh)
+	int size, capacity;	//sus propiedades
+	int top, bottom;
+} q;	//declaramos q, la serpiente
+
+char screen[N][M];//arreglo de M columnas y N filas que es la pantalla
+char buffer[(N * M) + 1 + N];//el +1 es para el caracter nulo que termina la cadena y el +N para los saltos de linea
+
+//prototipos
+int isEmpty();
+point getTop();
+void dequeue();
+void enqueue(point p);
+void setPoint(point p, char c);
+void clear();
+void display();
+void wait(int L);
+int welcome();
+
+int main() {
+	int level = welcome();//da instrucciones y escoge nivel
+	int playAgain = 0;
+
+	do {//juego activo
+		q.capacity = 100;	//inicializar cosas
+		q.size = 0;
+		q.top = -1;
+		q.bottom = 0;
+		point p1 = { 3, 3 };
+		point p2 = { 4, 3 };
+		point p3 = { 5, 3 };//sets las coordenadas de las 3 partes del cuerpo inciales
+		enqueue(p1);	//le mete estos valores iniciales a la cola
+		enqueue(p2);
+		enqueue(p3);
+		point apple = { 10, 10 };
+		point vel = { 0, -1 };	//vel inicial
+		int gameOver = 0;
+		int needApple = 0;
+
+		while (!gameOver) {	//ciclo de animacion
+
+			wait(level);
+
+			clear();
+
+			//------------------------------------------ACTUALIZAR JUEGO----------------------------------------------------------------------
+			char key;
+			int i;
+
+			//cambio en la direccion--vector velocidad
+			if (kbhit()) {
+				key = getch();
+				if (key == 'w' && vel.y != 1)	//parriba
+				{
+					vel.y = -1;
+					vel.x = 0;
+				}
+				if (key == 'd' && vel.x != -1)	//der
+				{
+					vel.x = 1;
+					vel.y = 0;
+				}
+				if (key == 's' && vel.y != -1)	//pabajo
+				{
+					vel.y = 1;
+					vel.x = 0;
+				}
+				if (key == 'a' && vel.x != -1)	//izq
+				{
+					vel.x = -1;
+					vel.y = 0;
+				}
+				fflush(stdin);
+			}
+
+			point newHead = getTop();
+			newHead.x = (newHead.x + vel.x + M) % M;//cabeza avanza con ajuste por si es negativo
+			newHead.y = (newHead.y + vel.y + N) % N;
+
+			for (	i = q.bottom;
+					((i + q.capacity - q.bottom) % q.capacity) < q.size;
+					i = (i + 1) % q.capacity)	//con cada parte del cuerpo
+			{
+				if (newHead.x == q.arr[i].x && newHead.y == q.arr[i].y)	//checa si la cabeza de la serpiente choca con alguna parte de su cuerpo
+				{
+					gameOver = 1;	//perdio
+					break;
+				}
+			}
+			if (newHead.x == apple.x && newHead.y == apple.y) {
+				needApple = 1;	//predemos la bandera(que luego se usara)
+			}
+
+			enqueue(newHead);	//encola
+
+			if (!needApple)
+				dequeue();//solo descola si no se comio una manzana (en cuyo caso no necesita decolar pues la serpiente crece)
+			else {
+				do {
+					apple.x = rand() % M;	//genera una nueva manazana cada vez, hasta generar una manzana buena
+					apple.y = rand() % N;
+					needApple = 0;
+					for (i = q.bottom; ((i + q.capacity - q.bottom) % q.capacity) < q.size; i = (i + 1) % q.capacity)//que no ocupe el mismo lugar que la serpiente
+						if (apple.x == q.arr[i].x && apple.y == q.arr[i].y)
+							needApple = 1;
+				} while (needApple);
+			}	//else
+
+			//------------------------------------------------ACTUALIZAR JUEGO----------------------------------------------------------------------------
+
+			//draw
+			for (i = q.bottom; ((i + q.capacity - q.bottom) % q.capacity) < q.size; i = (i + 1) % q.capacity) setPoint(q.arr[i], '*');	//serpiente
+
+			setPoint(apple, '@');	//apple
+
+			display();
+
+			for (i = q.bottom; ((i + q.capacity - q.bottom) % q.capacity) < q.size;	i = (i + 1) % q.capacity)	//checar si choco, game over?
+			{
+				if (q.arr[i].x == q.arr[i + 1].x && q.arr[i].y == q.arr[i + 1].y) {
+					gameOver = 1;
+					break;}	//se sale del for
+			}
+		}//while animacion
+
+		printf("\n\n\tGAME OVER.\n\n\tSCORE: %d", ((q.size - 3) * 10));//eso es el score
+		puts("\n\n\tWanna play again? (Y/N)");
+		char answer;
+		scanf("%c", &answer);
+		if (answer == 'Y' || answer == 'y')	playAgain = 1;
+
+	} while (playAgain);
+	puts("Have a good day, bye bye.");
+	return 0;
+}	//main
+
+//otras funciones
+int isEmpty() {	//checa si la cola esta llena
+	return (q.size == 0);
+}
+
+point getTop() {//devuelve el top de la cola=la actual cabeza de la serpiente
+	return q.arr[q.top];
+}
+
+void dequeue() {	//decolar
+	if (!isEmpty()) {	//checas que la cola no esta vacia
+		q.size--;
+		q.bottom++;
+		q.bottom %= q.capacity;	//reestablece el bottom de la cola (el modulo es para reciclar la cola)
+	}
+}
+
+void enqueue(point p) {	//encolar
+	if (q.size < q.capacity) {	//checa que la cola no este al borde, full
+		q.size++;
+		q.top++;
+		q.top %= q.capacity;//reestablece el top de la cola (que es la cabeza de la serpiente)
+		q.arr[q.top] = p;	//ahora la cabeza es el nuevo punto que encolamos
+	}
+}
+
+void setPoint(point p, char c) {//convierte un punto(coordenada) a un caracter respetivo
+	screen[p.y][p.x] = c;
+}
+
+void clear() {
+	int i, j;
+	for (i = 0; i < N; i++)
+		for (j = 0; j < M; j++)
+			screen[i][j] = ' ';
+	for (i = 0; i < N; i++) {		//borde
+		screen[i][0] = '|';
+		screen[i][M - 1] = '|';
+	}
+	for (j = 0; j < M; j++) {
+		screen[0][j] = '-';
+		screen[N - 1][j] = '-';
+	}
+}
+
+void display() {
+	system("cls");
+	int counter = 0;
+	int i, j;
+	for (i = 0; i < N; i++, counter++) {//traduce screen a buffer
+		for (j = 0; j < M; j++, counter++){
+			buffer[counter] = screen[i][j];
+		}
+		buffer[counter] = '\n';
+	}
+	buffer[counter] = '\0';
+
+	printf("%s\n", buffer);//imprimiendo asi todo el buffer de un jalon
+}
+
+void wait(int l) {
+	int msec = 0, trigger = (120 - 30*l);
+	clock_t before = clock();
+	clock_t difference;
+	do {
+		difference = clock() - before;
+		msec = difference * 1000 / CLOCKS_PER_SEC;
+	} while (msec < trigger);
+}
+
+int welcome() {
+	system("cls");
+	puts( "\n\t Welcome to the Snake Game! What level do you wanna play?");
+	puts( "\n 1-beginner   2-intermediate   3-expert ");
+	int level;
+	scanf("%d", &level);
+	system("cls");
+	puts("\n\t\tGreat, now use the keys 'a' 's' 'd' 'w' to operate.");
+	puts("\n\t\tYou will be provided apples which you have to eat.");
+	puts("\n\tPress any key to play game...");
+	getch();
+	fflush(stdin);
+	fflush(stdout);
+	return level;
+}
